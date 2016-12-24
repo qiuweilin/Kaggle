@@ -39,32 +39,52 @@ if __name__ == '__main__':
         weights.append(gift_weight)
 
     unsorted_gifts = unsorted_gifts.assign(weights = weights)
+    unsorted_gifts = unsorted_gifts.sort_values('weights', axis=0, ascending=0)
+    all_gifts = unsorted_gifts
+    all_gifts = all_gifts.assign(bag_number = np.nan)
+    gift_id = 0
 
     # Sort gifts into 1000 bags
-    gift_id = 0
-    sorted_gifts = []
-    sorted_gifts.append(['Gifts'])
+    sorted_gifts = []  # list of each bag
+    sorted_gifts.append(['Gifts'])  # list of list of each bag
 
     for i in range(0,1000):
-        sorted_gift = []
-        str = ''
+        str1 = ''
         bag_weight = 0
+        gift_count = 0
         # keep adding gift to bag if total weight is less than 50
-        while bag_weight < 50:
+        while (bag_weight + unsorted_gifts.iloc[0, 1]) < 50:
             # script breaks out of loop if run out of gifts to sort
-            if gift_id < len(unsorted_gifts):
-                str = str + unsorted_gifts.iloc[gift_id, 0] + ' '
-                bag_weight += unsorted_gifts.iloc[gift_id, 1]
-                gift_id += 1
+            if not unsorted_gifts.empty:
+                str1 = str1 + unsorted_gifts.iloc[0, 0] + ' '
+                bag_weight += unsorted_gifts.iloc[0, 1]
+                # once in bag, remove gift from the available gift list
+                unsorted_gifts = unsorted_gifts.iloc[1:,]
+                all_gifts.iloc[gift_id, 2] = int(i+1)
+                gift_count += 1
             else:
                 break
+            gift_id += 1
 
-        sorted_gift.append(str)
-        sorted_gifts.append(sorted_gift)
+        # TODO: Check each bag must have 3 or more gifts
+        df = unsorted_gifts
+        gift_to_drop = []
+        while gift_count < 3 :
+            # find gifts that would not make bag weight heavier than 50
+            df = df.ix[df['weights'] < (50-bag_weight)]
+            if not df.empty:
+                # sort so that you add the heaviest gift first to the bag
+                # this ensures smaller gifts are kept in the list to fill in
+                # bags that can only take smaller gifts
+                df = df.sort_values('weights', axis=0, ascending=0)
+                str1 = str1 + df.iloc[0, 0] + ' '
+                bag_weight += df.iloc[0, 1]
+                gift_to_drop.append(df.index[0])
 
-    # TODO: Check each bag must have 3 or more gifts
+            gift_count += 1
 
-    # TODO: Check no gift used more than once
+        unsorted_gifts = unsorted_gifts.drop(gift_to_drop)
+        sorted_gifts.append([str1])
 
     resultFile = open("output.csv",'wb')
     wr = csv.writer(resultFile, delimiter = ',')
