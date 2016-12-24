@@ -45,11 +45,10 @@ def simulate_weights(unsorted_gifts):
     return unsorted_gifts
 
 
-def sort_into_bags(sorted_gifts_df, unsorted_gifts, index):
+def sort_into_bags(sorted_gifts_df, unsorted_gifts, index, no_bag):
     # sorts the first 3000 lightest gifts into 1000 bags
-
-    gifts = unsorted_gifts.iloc[:1000,0].tolist()
-    weights = unsorted_gifts.iloc[:1000,1].tolist()
+    gifts = unsorted_gifts.iloc[no_bag,0].tolist()
+    weights = unsorted_gifts.iloc[no_bag,1].tolist()
     sorted_gifts_df = sorted_gifts_df.assign(gift=gifts)
     col = len(sorted_gifts_df.columns)
     sorted_gifts_df = sorted_gifts_df.rename(columns =
@@ -62,7 +61,7 @@ def sort_into_bags(sorted_gifts_df, unsorted_gifts, index):
         sorted_gifts_df = sorted_gifts_df.assign(total_weight=
                                              sorted_gifts_df['total_weight']
                                              + weights)
-    unsorted_gifts = unsorted_gifts.iloc[1001:,]
+    unsorted_gifts = unsorted_gifts.drop(unsorted_gifts.index[no_bag])
 
     return sorted_gifts_df, unsorted_gifts
 
@@ -82,25 +81,35 @@ if __name__ == '__main__':
     # setting up DataFrame to store bag information
     sorted_gifts_df = pd.DataFrame(np.nan, \
                                    columns=['total_weight'],
-                                   index=range(1,1001))
+                                   index=range(0,1000))
     sorted_gifts_df.index.names = ['Bag']
 
     # sort the lightest 3000 gifts into the bags
-    for index in range(0,3):
-        sorted_gifts_df, unsorted_gifts = sort_into_bags(sorted_gifts_df,
-                                                         unsorted_gifts,
-                                                         index)
-    # TODO: adding additional gifts
+    no_bag = list(range(0,1000))
+    index = 0
+    while True:
+        if sorted_gifts_df.ix[sorted_gifts_df['total_weight']>50].empty:
+            sorted_gifts_df, unsorted_gifts = sort_into_bags(sorted_gifts_df,
+                                                             unsorted_gifts,
+                                                             index, no_bag)
+            index += 1
+        else:
+            no_bag
+            break
 
+    print("reached here")
+    print sorted_gifts_df
     # converting data in DataFrame into list of list of strings
     sorted_gifts = [['Gifts']]
-    sorted_list = sorted_gifts_df.drop(['total_weight'],1)
+    sorted_gifts_df = sorted_gifts_df.drop(['total_weight'],1)
 
     for i in range(0, len(sorted_gifts_df)):
+        sorted_list = sorted_gifts_df.iloc[i,:]
         sorted_list = ' '.join(sorted_list)
         sorted_gifts.append([sorted_list])
 
+    print sorted_gifts
     # write result to csv file
-    #resultFile = open("output.csv",'wb')
-    #wr = csv.writer(resultFile, delimiter = ',')
-    #wr.writerows(sorted_gifts)
+    resultFile = open("output.csv",'wb')
+    wr = csv.writer(resultFile, delimiter = ',')
+    wr.writerows(sorted_gifts)
