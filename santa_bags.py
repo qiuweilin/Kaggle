@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     unsorted_gifts = unsorted_gifts.assign(weights = weights)
 
-    # TODO: Sort gifts into 1000 bags
+    # Sort gifts into 1000 bags
     gift_id = 0
     sorted_gifts = []
     sorted_gifts.append(['Gifts'])
@@ -49,7 +49,9 @@ if __name__ == '__main__':
         sorted_gift = []
         str = ''
         bag_weight = 0
+        # keep adding gift to bag if total weight is less than 50
         while bag_weight < 50:
+            # script breaks out of loop if run out of gifts to sort
             if gift_id < len(unsorted_gifts):
                 str = str + unsorted_gifts.iloc[gift_id, 0] + ' '
                 bag_weight += unsorted_gifts.iloc[gift_id, 1]
