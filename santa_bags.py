@@ -60,11 +60,10 @@ if __name__ == '__main__':
         sorted_gift.append(str)
         sorted_gifts.append(sorted_gift)
 
-    resultFile = open("output.csv",'wb')
-    wr = csv.writer(resultFile, delimiter = ',')
-    wr.writerows(sorted_gifts)
-
-
     # TODO: Check each bag must have 3 or more gifts
 
     # TODO: Check no gift used more than once
+
+    resultFile = open("output.csv",'wb')
+    wr = csv.writer(resultFile, delimiter = ',')
+    wr.writerows(sorted_gifts)
