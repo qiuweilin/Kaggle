@@ -31,10 +31,10 @@ def simulate_weights(unsorted_gifts):
     # find the name of the item and simulate the weight through
     # function weight.
     # adds weights as a column in the dataframe unsorted_gifts.
-    gift_regex = re.compile(r'([a-zA-Z])+')
     weights = []
     for i, row in unsorted_gifts.iterrows():
-        gift = gift_regex.search(row['GiftId']).group()
+        gift = row['GiftId'].split('_')[0]
+
         # simulate the weight of the item
         gift_weight = weight(gift)
         weights.append(gift_weight)
