@@ -45,19 +45,35 @@ def simulate_weights(unsorted_gifts):
     return unsorted_gifts
 
 
-def sort_into_bags(current_weight, unsorted_gifts, index, no_bag):
-    # sorts gifts into no_bag and returns new weights of bags
-    # list of gift sorted, and the gifts that are still unsorted after this
+def sort_into_bags(sorted_gifts_df, unsorted_gifts, index, no_bag):
+    # sorts gifts into no_bag and
+    # (1) updates DataFrame with new weights of bags in 'test_weight'
+    # (2) returns list of gift sorted,
+    # (3) weights of the gift sorted, as a list
+    # (4) and the gifts that are still unsorted after this
+
+    unsorted_gifts.index = range(0, len(unsorted_gifts))
+
+    # if less than 1000 gifts, sort only whatever gifts is left into bags
+    if len(no_bag) > len(unsorted_gifts) :
+        no_bag = list(range(0,len(unsorted_gifts)))
     gift_list = unsorted_gifts.iloc[no_bag,0].tolist()
     weights = unsorted_gifts.iloc[no_bag,1].tolist()
 
     if index == 0:
-        current_weight = weights
+        sorted_gifts_df['test_weight'] = weights
     else:
-        current_weight += weights
+        # update test_weights for bags that have gifts added.
+        updated_bags =\
+        sorted_gifts_df.loc[sorted_gifts_df.index[0:len(no_bag)],'test_weight']
+        updated_bags = updated_bags + weights
+        sorted_gifts_df.loc[sorted_gifts_df.index[0:len(no_bag)],'test_weight']=\
+        updated_bags
+
+    # drop gifts that have been sorted into bags, from unsorted_gifts
     unsorted_gifts = unsorted_gifts.drop(unsorted_gifts.index[no_bag])
 
-    return current_weight, gift_list, unsorted_gifts
+    return gift_list, weights, unsorted_gifts
 
 if __name__ == '__main__':
 
@@ -74,20 +90,30 @@ if __name__ == '__main__':
 
     # setting up DataFrame to store bag information
     sorted_gifts_df = pd.DataFrame(np.nan, \
-                                   columns=['total_weight'],
+                                   columns=['total_weight', 'test_weight'],
                                    index=range(0,1000))
     sorted_gifts_df.index.names = ['Bag']
 
     # keep adding light items into bag as long as bags are <50lbs
     no_bag = list(range(0,1000))
-    index = 0
+    index = 0  # track number of gifts in bags
     while True:
-        current_weight = sorted_gifts_df['total_weight']
-        current_weight, gift_list, unsorted_gifts = \
-        sort_into_bags(current_weight, unsorted_gifts, index, no_bag)
+        # sort into bags and find weight after adding gifts
+        sorted_gifts_df = sorted_gifts_df.assign(test_weight=
+                                                 sorted_gifts_df['total_weight'])
+        gift_list, weights, unsorted_gifts = \
+        sort_into_bags(sorted_gifts_df, unsorted_gifts, index, no_bag)
 
-        if max(current_weight) < 50:
-            sorted_gifts_df['total_weight'] = current_weight
+        # if all bags weigh less than 50 after adding gifts,
+        # add all gifts to bag into new column.
+        # Update total weight as the test_weight
+        if max(sorted_gifts_df['test_weight']) < 50:
+            sorted_gifts_df['total_weight'] = sorted_gifts_df['test_weight']
+            if len(gift_list) < len(sorted_gifts_df):
+                missing_len = len(sorted_gifts_df) - len(gift_list)
+                a = np.empty(missing_len) * np.nan
+                gift_list = gift_list + a.tolist()
+
             sorted_gifts_df = sorted_gifts_df.assign(gift=gift_list)
             col = len(sorted_gifts_df.columns)
             sorted_gifts_df = sorted_gifts_df.rename(columns =
@@ -95,25 +121,69 @@ if __name__ == '__main__':
                                                     'gift_%s' % (index+1)})
             index += 1
 
-        #elif max(current_weight) > 50:
-        # TODO: find bags that exceed 50lbs,
-        # TODO: remove those bag numbers from no_bag
-        # TODO: re-run sort_into_bags to add gifts into bags that can still
-        # TODO: take more items
-        else:
-            break
+        # find bags that exceed 50lbs, return those gifts to unsorted_gifts
+        # update the bags that do not exceed 50lbs, with the new gifts
 
+        elif max(sorted_gifts_df['test_weight']) > 50:
+            temp = sorted_gifts_df.ix[sorted_gifts_df['test_weight']<50]
+            unused_df = sorted_gifts_df.ix[sorted_gifts_df['test_weight']>50]
+
+            if len(unused_df) == len(gift_list):
+                # breaks if no bags can take gifts without exceeding 50lbs
+                break
+
+            # put back un-used gifts into unsorted_gifts
+            unused_list = [gift_list[x] for x in unused_df.index.tolist()]
+            unused_weights = [weights[x] for x in unused_df.index.tolist()]
+            unused = pd.DataFrame({'GiftId': unused_list,
+                                   'weights': unused_weights})
+            unsorted_gifts = pd.concat([unsorted_gifts, unused])
+            unsorted_gifts = unsorted_gifts.sort_values('weights',
+                                                        axis=0,
+                                                        ascending=1)
+            # for bags that do not add new gifts
+            # un-do test weight and set test_weight as the current weight without
+            # additional gifts
+            unused_df = unused_df.assign(test_weight=
+                                         unused_df['total_weight'])
+            sorted_gifts_df.update(unused_df)
+
+            # update bags that can add gifts without exceeding 50lbs
+            if len(gift_list) > len(temp):
+                gift_list = [gift_list[x] for x in temp.index.tolist()]
+            elif len(gift_list) < len(temp):
+                missing_len = len(temp) - len(gift_list)
+                empty_list = np.empty(missing_len) * np.nan
+                gift_list = gift_list + empty_list
+
+            temp = temp.assign(gift=gift_list)
+            sorted_gifts_df = sorted_gifts_df.assign(gift=np.nan)
+            sorted_gifts_df.update(temp)
+            col = len(sorted_gifts_df.columns)
+            sorted_gifts_df = sorted_gifts_df.rename\
+            (columns={sorted_gifts_df.columns[col-1]: 'gift_%s' % (index+1)})
+            # re-sort sorted_gifts_df by current weights
+            sorted_gifts_df['total_weight'] = sorted_gifts_df['test_weight']
+            sorted_gifts_df = sorted_gifts_df.sort_values('total_weight',
+                                                          axis=0,
+                                                          ascending=1)
+            index += 1
+
+        if unsorted_gifts.empty:
+            # if no gifts left to sort, break out of loop.
+            break
 
     # converting data in DataFrame into list of list of strings
     sorted_gifts = [['Gifts']]
     sorted_gifts_df = sorted_gifts_df.drop(['total_weight'],1)
+    sorted_gifts_df = sorted_gifts_df.drop(['test_weight'],1)
 
     for i in range(0, len(sorted_gifts_df)):
         sorted_list = sorted_gifts_df.iloc[i,:]
+        sorted_list = sorted_list.dropna(how='any')
         sorted_list = ' '.join(sorted_list)
         sorted_gifts.append([sorted_list])
 
-    print sorted_gifts
     # write result to csv file
     resultFile = open("output.csv",'wb')
     wr = csv.writer(resultFile, delimiter = ',')
